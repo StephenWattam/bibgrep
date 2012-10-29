@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 
 # Version
-VERSION = '0.1.0 (29-10-12)'
+VERSION = '0.1.1 (29-10-12)'
 
 # If no regex is given,. check the field exists
 DEFAULT_RX = "\.+"
@@ -13,6 +13,7 @@ OPTIONS = {
             :a => {:desc => "Output Author"},
             :t => {:desc => "Output Title"},
             :j => {:desc => "Output Journal"},
+            :r => {:desc => "Output full record (overrides other output options)"},
             # :a => {:desc => ""},
             # :a => {:desc => ""},
             :f => {:desc => "Output filename (default if multiple files used)"},
@@ -39,7 +40,7 @@ OPTIONS = {
 # Which of the above options define output?
 # This is defined such that it can check if someone has accidentally
 # turned off all output 
-OUTPUT_OPTIONS          = "kTatjf".chars.map{|c| c.to_sym}
+OUTPUT_OPTIONS          = "rkTatjf".chars.map{|c| c.to_sym}
 
 # Default options to use when none are specified
 DEFAULT_OPTIONS         = "katw".chars.map{|c| c.to_sym}
@@ -255,15 +256,24 @@ files.each{|filename, f|
 
     # output
     if match then
-      output = ""
-      output += "#{filename}: "                                     if options.include?(:f)
-      output += "#{placeholder(b.key, 'key', options)}: "           if options.include?(:k)
-      output += "#{placeholder(b.type, 'type', options)}: "         if options.include?(:T)
-      output += "#{placeholder(b.author, 'author', options)}: "     if options.include?(:a)
-      output += "`#{placeholder(b.title, 'title', options)}' "      if options.include?(:t)
-      output += "in #{placeholder(b.journal, 'journal', options)}"  if options.include?(:j)
-      # output += "#{b.type}: "   if options.include?(:t)
 
+      # define output
+      output = ""
+
+      # check if we want raw output or not
+      if options.include?(:r) then
+        output += b.to_s
+      else
+        output += "#{filename}: "                                     if options.include?(:f)
+        output += "#{placeholder(b.key, 'key', options)}: "           if options.include?(:k)
+        output += "#{placeholder(b.type, 'type', options)}: "         if options.include?(:T)
+        output += "#{placeholder(b.author, 'author', options)}: "     if options.include?(:a)
+        output += "`#{placeholder(b.title, 'title', options)}' "      if options.include?(:t)
+        output += "in #{placeholder(b.journal, 'journal', options)}"  if options.include?(:j)
+        # output += "#{b.type}: "   if options.include?(:t)
+      end
+
+      # and output
       puts output if output.length > 0
     end
   }
