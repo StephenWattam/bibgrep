@@ -1,5 +1,7 @@
 #!/usr/bin/env ruby
 
+# Version
+VERSION = '0.1.0 (29-10-12)'
 
 # If no regex is given,. check the field exists
 DEFAULT_RX = "\.+"
@@ -33,11 +35,23 @@ OPTIONS = {
             :h => {:desc => "Output help"}
           }
 
+
+# Which of the above options define output?
+# This is defined such that it can check if someone has accidentally
+# turned off all output 
 OUTPUT_OPTIONS          = "kTatjf".chars.map{|c| c.to_sym}
-DEFAULT_OPTIONS         = "katwI".chars.map{|c| c.to_sym}
+
+# Default options to use when none are specified
+DEFAULT_OPTIONS         = "katw".chars.map{|c| c.to_sym}
+
+# Default output options to apply if someone specifies none
+# from the OUTPUT_OPTIONS hash and fails to also specify :o
 DEFAULT_OUTPUT_OPTIONS  = "kat".chars.map{|c| c.to_sym}
 
-def usage()
+# Print usage, version info
+def usage
+  $stderr.puts "BibGrep v#{VERSION}"
+  $stderr.puts ""
   $stderr.puts "USAGE: #{$0} -FLAGS [+FIELD[=RX] [+FIELD[=RX] [...]]] [FILE [FILE [...]]"
   $stderr.puts ""
   $stderr.puts "Where..."
@@ -59,12 +73,22 @@ def usage()
   $stderr.puts " If no files are given, I will read from stdin."
 end
 
+# Return blank values with a placeholder, 
+# if the options list dictates
+def placeholder(value, placeholder, options)
+  return value if options.include?(:p)
+  return value || "<no #{placeholder}>"
+end
+
+# Parse input options, returning:
+#  input files and filenames
+#  a hash of conditions to apply to bibtex
+#  option flags
 def parse_args
   # Create slots for conditions and files
   files       = {} 
   conditions  = {}
   options     = DEFAULT_OPTIONS
-
 
   # Parse input arguments
   force_file = false
@@ -167,6 +191,12 @@ require 'bibtex'
 # -----------------------------------------------------------------------------
 # Load everything from ARGV
 files, conditions, options = parse_args
+
+
+
+
+# -----------------------------------------------------------------------------
+# If the help flag is set simply output help then exit
 if options.include?(:h) then
   usage
   exit(1)
@@ -195,13 +225,10 @@ if options.include?(:V) then
 end
 
 
-def placeholder(value, placeholder, options)
-  return value if options.include?(:p)
-  return value || "<no #{placeholder}>"
-end
 
 
 # -----------------------------------------------------------------------------
+# Processing loop proper.
 files.each{|filename, f|
   # Check validity, but don't let it stop us parsing.
   $stderr.puts "BibTeX file #{filename} is invalid" if not options.include?(:w) and not BibTeX.valid?(f) 
@@ -237,7 +264,7 @@ files.each{|filename, f|
       output += "in #{placeholder(b.journal, 'journal', options)}"  if options.include?(:j)
       # output += "#{b.type}: "   if options.include?(:t)
 
-      puts output
+      puts output if output.length > 0
     end
   }
 }
