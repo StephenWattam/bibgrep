@@ -1,0 +1,243 @@
+#!/usr/bin/env ruby
+
+
+# If no regex is given,. check the field exists
+DEFAULT_RX = "\.+"
+
+OPTIONS = {
+            # Options affecting output 
+            :k => {:desc => "Output BibTeX key"},
+            :T => {:desc => "Output BibTeX type"},
+            :a => {:desc => "Output Author"},
+            :t => {:desc => "Output Title"},
+            :j => {:desc => "Output Journal"},
+            # :a => {:desc => ""},
+            # :a => {:desc => ""},
+            :f => {:desc => "Output filename (default if multiple files used)"},
+            :F => {:desc => "Suppress filename output with multiple files."},
+            :p => {:desc => "Suppress placeholders for empty fields"},
+
+            # Toggle default output off if desired
+            :o => {:desc => "Don't use default output options if none given"},
+
+            # Regex options
+            :v => {:desc => "Invert match"},
+            :i => {:desc => "Case-insensitive regex"},
+            :e => {:desc => "Extended regex"},
+            :m => {:desc => "Multi-line regex"},
+
+            # Misc.
+            # :q => {:desc => "Suppress file warnings"},
+            :w => {:desc => "Suppress BibTeX validity warnings"},
+            :V => {:desc => "Verbose (list conditions)"},
+            :h => {:desc => "Output help"}
+          }
+
+OUTPUT_OPTIONS          = "kTatjf".chars.map{|c| c.to_sym}
+DEFAULT_OPTIONS         = "katwI".chars.map{|c| c.to_sym}
+DEFAULT_OUTPUT_OPTIONS  = "kat".chars.map{|c| c.to_sym}
+
+def usage()
+  $stderr.puts "USAGE: #{$0} -FLAGS [+FIELD[=RX] [+FIELD[=RX] [...]]] [FILE [FILE [...]]"
+  $stderr.puts ""
+  $stderr.puts "Where..."
+  $stderr.puts " FIELD : A BibTeX key to match on."
+  $stderr.puts "    RX : Regex to match against the field.  Omitting"
+  $stderr.puts "         a pattern means we use the default, /#{DEFAULT_RX}/"
+  $stderr.puts "  FILE : The BibTeX file(s) to parse. If your filename"
+  $stderr.puts "         begins with a dash, prefix the argument with "
+  $stderr.puts "         two dashes thus: 'lsbib -- filename.bib'"
+  $stderr.puts " FLAGS : A string containing some of the options below."
+  $stderr.puts "         Default is -#{DEFAULT_OPTIONS.join('')}.  To unset options,"
+  $stderr.puts "         provide a single dash.  If you don't provide any"
+  $stderr.puts "         output options, the default output will be added"
+  $stderr.puts "         to your selection use -o to stop this."
+  OPTIONS.each{|k,v|
+  $stderr.puts "         -#{k} : #{v[:desc]}"
+  }
+  $stderr.puts ""
+  $stderr.puts " If no files are given, I will read from stdin."
+end
+
+def parse_args
+  # Create slots for conditions and files
+  files       = {} 
+  conditions  = {}
+  options     = DEFAULT_OPTIONS
+
+
+  # Parse input arguments
+  force_file = false
+  default_options = true
+  ARGV.each{|a|
+
+    # Test if it's an argument or a file
+    if %w{- +}.include?(a[0]) and not force_file then
+      
+      
+      # Check for separator
+      if a == '--' then
+        # Separator, turn force file mode on
+        force_file = true
+      elsif a[0] == '+' then
+        # condition
+        a = a[1..-1]  # Remove prefixed dash
+        value = DEFAULT_RX
+        key = a
+        if equals = a.index('=') then
+          key = a[0..(equals-1)]
+          value = a[(equals+1)..-1]
+        end
+
+        # Assign to list of things to check
+        conditions[key] = value
+      elsif a[0] == '-' then
+        if default_options
+          options = [] 
+          default_options = false
+        end
+        # option
+        a[1..-1].chars.each{|o|
+          if OPTIONS.keys.include?(o.to_sym)
+            options << o.to_sym 
+          else
+            $stderr.puts "Invalid option: #{o}"
+            # force help
+            options << :h
+          end
+        }
+      end
+
+
+    else
+      # file
+      if not File.readable?(a) then
+        $stderr.puts "Cannot read #{a}"
+      elsif File.directory?(a) then
+        $stderr.puts "#{a} is a directory"
+      else
+        files[a] = File.open(a)
+      end
+    end
+  }
+
+  # Default to stdin
+  files['<stdin>'] = STDIN if files.length == 0
+
+  # Check if any output options are given
+  # If they are not, turn them on by default
+  # This makes the thing easier to use, basically.
+  if not options.include?(:o) then
+    matches = false
+    OUTPUT_OPTIONS.each{|o|
+      matches = true if options.include?(o)
+    }
+    options += DEFAULT_OUTPUT_OPTIONS if not matches
+  end
+
+  # List filename by default if file length over 1
+  options << :f if not options.include?(:n) and files.length > 1
+
+  # Construct regex according to options
+  rx_flags = 0
+  rx_flags |= Regexp::IGNORECASE  if options.include?(:i)
+  rx_flags |= Regexp::EXTENDED    if options.include?(:e)
+  rx_flags |= Regexp::MULTILINE   if options.include?(:m)
+  conditions.each{|k, v|
+    conditions[k] = Regexp.new(v, rx_flags)
+  }
+
+  return files, conditions, options
+end
+
+# -----------------------------------------------------------------------------
+# Entry point
+# -----------------------------------------------------------------------------
+# Check the prerequisites match
+begin
+  gem 'bibtex-ruby'
+rescue
+  $stderr.puts "Please install the `bibtex-ruby' gem."
+  exit(1)
+end
+require 'bibtex'
+
+
+
+# -----------------------------------------------------------------------------
+# Load everything from ARGV
+files, conditions, options = parse_args
+if options.include?(:h) then
+  usage
+  exit(1)
+end
+
+
+
+# -----------------------------------------------------------------------------
+# Summarise, if requested
+if options.include?(:V) then
+  puts "Input files:"
+  files.keys.each{|f|
+    puts " #{f}"
+  }
+
+  puts "\nFilters:"
+  conditions.each{|k, v|
+    puts " #{k}: #{v.inspect}"
+  }
+
+  puts "\nActive Options: "
+  options.each{|o|
+    puts " #{o}: #{OPTIONS[o][:desc]}"
+  }
+  puts ""
+end
+
+
+def placeholder(value, placeholder, options)
+  return value if options.include?(:p)
+  return value || "<no #{placeholder}>"
+end
+
+
+# -----------------------------------------------------------------------------
+files.each{|filename, f|
+  # Check validity, but don't let it stop us parsing.
+  $stderr.puts "BibTeX file #{filename} is invalid" if not options.include?(:w) and not BibTeX.valid?(f) 
+
+  # Open file, optimistically
+  bib = BibTeX.parse(f.read)
+  bib.each{|b|
+
+    # Perform matching by unmatching things
+    # this does an AND in the arguments list
+    match = true
+    conditions.each{|key, rx|
+      if not b[key] =~ rx
+        # cancel the match
+        match = false 
+      else
+        # Report verbose matching info
+        puts "Entry #{b.key} in file #{filename} matches on key #{key}" if options.include?(:V) 
+      end
+    }
+
+    # Invert match if requested
+    match = (not match) if options.include?(:v)
+
+    # output
+    if match then
+      output = ""
+      output += "#{filename}: "                                     if options.include?(:f)
+      output += "#{placeholder(b.key, 'key', options)}: "           if options.include?(:k)
+      output += "#{placeholder(b.type, 'type', options)}: "         if options.include?(:T)
+      output += "#{placeholder(b.author, 'author', options)}: "     if options.include?(:a)
+      output += "`#{placeholder(b.title, 'title', options)}' "      if options.include?(:t)
+      output += "in #{placeholder(b.journal, 'journal', options)}"  if options.include?(:j)
+      # output += "#{b.type}: "   if options.include?(:t)
+
+      puts output
+    end
+  }
+}
