@@ -43,11 +43,11 @@ OPTIONS = {
 OUTPUT_OPTIONS          = "rkTatjf".chars.map{|c| c.to_sym}
 
 # Default options to use when none are specified
-DEFAULT_OPTIONS         = "katw".chars.map{|c| c.to_sym}
+DEFAULT_OPTIONS         = "rw".chars.map{|c| c.to_sym}
 
 # Default output options to apply if someone specifies none
 # from the OUTPUT_OPTIONS hash and fails to also specify :o
-DEFAULT_OUTPUT_OPTIONS  = "kat".chars.map{|c| c.to_sym}
+DEFAULT_OUTPUT_OPTIONS  = "r".chars.map{|c| c.to_sym}
 
 # Print usage, version info
 def usage
@@ -57,21 +57,21 @@ def usage
   $stderr.puts ""
   $stderr.puts "Where..."
   $stderr.puts " FIELD : A BibTeX key to match on."
-  $stderr.puts "    RX : Regex to match against the field.  Omitting"
-  $stderr.puts "         a pattern means we use the default, /#{DEFAULT_RX}/"
-  $stderr.puts "  FILE : The BibTeX file(s) to parse. If your filename"
-  $stderr.puts "         begins with a dash, prefix the argument with "
-  $stderr.puts "         two dashes thus: 'lsbib -- filename.bib'"
-  $stderr.puts " FLAGS : A string containing some of the options below."
-  $stderr.puts "         Default is -#{DEFAULT_OPTIONS.join('')}.  To unset options,"
-  $stderr.puts "         provide a single dash.  If you don't provide any"
-  $stderr.puts "         output options, the default output will be added"
-  $stderr.puts "         to your selection use -o to stop this."
+  $stderr.puts "     RX : Regex to match against the field.  Omitting"
+  $stderr.puts "          a pattern means we use the default, /#{DEFAULT_RX}/"
+  $stderr.puts "   FILE : The BibTeX file(s) to parse. If your filename"
+  $stderr.puts "          begins with a dash, prefix the argument with "
+  $stderr.puts "          two dashes thus: 'lsbib -- -.bib'"
+  $stderr.puts "  FLAGS : A string containing some of the options below."
+  $stderr.puts "          Default is -#{DEFAULT_OPTIONS.join('')}.  To unset options,"
+  $stderr.puts "          provide a single dash.  If you don't provide any"
+  $stderr.puts "          output options, the default output will be added"
+  $stderr.puts "          to your selection use -o to stop this."
   OPTIONS.each{|k,v|
-  $stderr.puts "         -#{k} : #{v[:desc]}"
+  $stderr.puts "          -#{k} : #{v[:desc]}"
   }
   $stderr.puts ""
-  $stderr.puts " If no files are given, I will read from stdin."
+  $stderr.puts "NB: If no files are given, I will read from stdin."
 end
 
 # Return blank values with a placeholder, 
