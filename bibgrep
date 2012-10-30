@@ -6,19 +6,31 @@ VERSION = '0.1.2 (30-10-12)'
 # If no regex is given,. check the field exists
 DEFAULT_RX = "\.+"
 
+# Individual field output formatting information.
+# Tells the tool how to extract info from each key
+OUTPUT_FIELD_FORMATS = {
+            :k => {:field => :key,     :str => '%s'},
+            :T => {:field => :type,    :str => '%s'},
+            :a => {:field => :author,  :str => '%s'},
+            :t => {:field => :title,   :str => "'%s'"},
+            :j => {:field => :journal, :str => '%s'},
+          }
+
 OPTIONS = {
-            # Options affecting output 
+            # Options affecting grep-style output 
             :k => {:desc => "Output BibTeX key"},
             :T => {:desc => "Output BibTeX type"},
             :a => {:desc => "Output Author"},
             :t => {:desc => "Output Title"},
             :j => {:desc => "Output Journal"},
-            :r => {:desc => "Output full record (overrides other output options)"},
             # :a => {:desc => ""},
             # :a => {:desc => ""},
             :f => {:desc => "Output filename (default if multiple files used)"},
             :F => {:desc => "Suppress filename output with multiple files."},
             :p => {:desc => "Suppress placeholders for empty fields"},
+            
+            # Raw output
+            :r => {:desc => "Output full record (overrides other output options)"},
 
             # Toggle default output off if desired
             :o => {:desc => "Don't use default output options if none given"},
@@ -75,13 +87,6 @@ def usage
   }
   $stderr.puts ""
   $stderr.puts "NB: If no files are given, I will read from stdin."
-end
-
-# Return blank values with a placeholder, 
-# if the options list dictates
-def placeholder(value, placeholder, options)
-  return value if options.include?(:p)
-  return value || "<no #{placeholder}>"
 end
 
 # Parse input options, returning:
@@ -165,6 +170,7 @@ def parse_args
 
   # List filename by default if file length over 1
   options << :f if not options.include?(:n) and files.length > 1
+  options.delete(:f) if options.include?(:F)
 
   # Construct regex according to options
   rx_flags = 0
@@ -261,23 +267,35 @@ files.each{|filename, f|
       if match then
 
         # define output
-        output = ""
+        output = []
 
         # check if we want raw output or not
         if options.include?(:r) then
-          output += b.to_s
+          output << b.to_s
         else
-          output += "#{filename}: "                                     if options.include?(:f)
-          output += "#{placeholder(b.key, 'key', options)}: "           if options.include?(:k)
-          output += "#{placeholder(b.type, 'type', options)}: "         if options.include?(:T)
-          output += "#{placeholder(b.author, 'author', options)}: "     if options.include?(:a)
-          output += "`#{placeholder(b.title, 'title', options)}' "      if options.include?(:t)
-          output += "in #{placeholder(b.journal, 'journal', options)}"  if options.include?(:j)
-          # output += "#{b.type}: "   if options.include?(:t)
+          # Add the filename if people want
+          output << "#{filename}" if options.include?(:f)
+
+          # Then check each option to retain order
+          # Fields are not available for comments, so simply output the contents if -c is set:
+          if options.include?(:c) and b.type.to_s.downcase == 'comment' then
+            output << b.content
+          else
+            options.each{|o|
+              if OUTPUT_FIELD_FORMATS.keys.include?(o) then
+                # Load value and apply placeholder if empty
+                val   = b.send(OUTPUT_FIELD_FORMATS[o][:field])
+                val ||= "<no #{OUTPUT_FIELD_FORMATS[o][:field]}>" if not options.include?(:p)
+
+                # Add to the output array
+                output << OUTPUT_FIELD_FORMATS[o][:str] % val
+              end
+            }
+          end
         end
 
         # and output
-        puts output if output.length > 0
+        puts output.join(": ") if output.length > 0
       end
     end
   }
