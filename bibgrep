@@ -112,17 +112,14 @@ def parse_args
 
               # Handle output specially
               if o == 'o' then
+                options << :o
                 # Tell the loop to ignore further things from this group
                 long_arg = true
                 
                 # Ignore leading equals and cut up by space
                 fields = a[(i+1)..-1].gsub(/^=/, '').split(',')
-                if fields.length == 0 then
-                  $stderr.puts "No fields given for output!"
-                  options << :h
-                else
+                if fields.length > 0 then
                   output += fields
-                  options << :o
                 end
 
               else
