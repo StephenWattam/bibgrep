@@ -1,39 +1,19 @@
 #!/usr/bin/env ruby
 
 # Version
-VERSION = '0.1.2 (30-10-12)'
+VERSION = '0.1.3 (30-10-12)'
 
 # If no regex is given,. check the field exists
 DEFAULT_RX = "\.+"
 
-# Individual field output formatting information.
-# Tells the tool how to extract info from each key
-OUTPUT_FIELD_FORMATS = {
-            :k => {:field => :key,     :str => '%s'},
-            :T => {:field => :type,    :str => '%s'},
-            :a => {:field => :author,  :str => '%s'},
-            :t => {:field => :title,   :str => "'%s'"},
-            :j => {:field => :journal, :str => '%s'},
-          }
-
 OPTIONS = {
-            # Options affecting grep-style output 
-            :k => {:desc => "Output BibTeX key"},
-            :T => {:desc => "Output BibTeX type"},
-            :a => {:desc => "Output Author"},
-            :t => {:desc => "Output Title"},
-            :j => {:desc => "Output Journal"},
-            # :a => {:desc => ""},
-            # :a => {:desc => ""},
             :f => {:desc => "Output filename (default if multiple files used)"},
             :F => {:desc => "Suppress filename output with multiple files."},
             :p => {:desc => "Suppress placeholders for empty fields"},
             
             # Raw output
-            :r => {:desc => "Output full record (overrides other output options)"},
-
-            # Toggle default output off if desired
-            :o => {:desc => "Don't use default output options if none given"},
+            :r => {:desc => "Output BibTeX (Cannot be used with -o)"},
+            :o => {:desc => "Specify output fields (o[=]field[,field[,field]])"},
 
             # Regex options
             :v => {:desc => "Invert match"},
@@ -52,23 +32,14 @@ OPTIONS = {
           }
 
 
-# Which of the above options define output?
-# This is defined such that it can check if someone has accidentally
-# turned off all output 
-OUTPUT_OPTIONS          = "rkTatjf".chars.map{|c| c.to_sym}
-
 # Default options to use when none are specified
 DEFAULT_OPTIONS         = "rw".chars.map{|c| c.to_sym}
-
-# Default output options to apply if someone specifies none
-# from the OUTPUT_OPTIONS hash and fails to also specify :o
-DEFAULT_OUTPUT_OPTIONS  = "r".chars.map{|c| c.to_sym}
 
 # Print usage, version info
 def usage
   $stderr.puts "BibGrep v#{VERSION}"
   $stderr.puts ""
-  $stderr.puts "USAGE: #{$0} -FLAGS [+FIELD[=RX] [+FIELD[=RX] [...]]] [FILE [FILE [...]]"
+  $stderr.puts "USAGE: #{$0} -FLAGS -oFIELD -o=FIELD,FIELD2 [+FIELD[=RX] [+FIELD[=RX] [...]]] [FILE [FILE [...]]"
   $stderr.puts ""
   $stderr.puts "Where..."
   $stderr.puts " FIELD : A BibTeX key to match on."
@@ -77,11 +48,10 @@ def usage
   $stderr.puts "   FILE : The BibTeX file(s) to parse. If your filename"
   $stderr.puts "          begins with a dash, prefix the argument with "
   $stderr.puts "          two dashes thus: 'lsbib -- -.bib'"
+  
+  $stderr.puts "  FIELD : One of BibTeX's field names.  Not case-sensitive."
   $stderr.puts "  FLAGS : A string containing some of the options below."
-  $stderr.puts "          Default is -#{DEFAULT_OPTIONS.join('')}.  To unset options,"
-  $stderr.puts "          provide a single dash.  If you don't provide any"
-  $stderr.puts "          output options, the default output will be added"
-  $stderr.puts "          to your selection use -o to stop this."
+  $stderr.puts "          Default is -#{DEFAULT_OPTIONS.join('')}."
   OPTIONS.each{|k,v|
   $stderr.puts "          -#{k} : #{v[:desc]}"
   }
@@ -98,6 +68,7 @@ def parse_args
   files       = {} 
   conditions  = {}
   options     = DEFAULT_OPTIONS
+  output      = []
 
   # Parse input arguments
   force_file = false
@@ -129,14 +100,40 @@ def parse_args
           options = [] 
           default_options = false
         end
+
         # option
-        a[1..-1].chars.each{|o|
-          if OPTIONS.keys.include?(o.to_sym)
-            options << o.to_sym 
-          else
-            $stderr.puts "Invalid option: #{o}"
-            # force help
-            options << :h
+        long_arg = false
+        (1..(a.length-1)).each{|i|
+          if not long_arg then
+            # Single-char options
+            o = a[i]
+          
+            if OPTIONS.keys.include?(o.to_sym)
+
+              # Handle output specially
+              if o == 'o' then
+                # Tell the loop to ignore further things from this group
+                long_arg = true
+                
+                # Ignore leading equals and cut up by space
+                fields = a[(i+1)..-1].gsub(/^=/, '').split(',')
+                if fields.length == 0 then
+                  $stderr.puts "No fields given for output!"
+                  options << :h
+                else
+                  output += fields
+                  options << :o
+                end
+
+              else
+                # Flag option
+                options << o.to_sym 
+              end
+            else
+              $stderr.puts "Unrecognised option: #{o}"
+              # force help
+              options << :h
+            end
           end
         }
       end
@@ -154,19 +151,14 @@ def parse_args
     end
   }
 
+  # Check that either -r or -o=field is given
+  if options.include?(:r) and output.length > 0 then
+    $stderr.puts "Option -r cannot be used with -o."
+    options << :h
+  end
+
   # Default to stdin
   files['<stdin>'] = STDIN if files.length == 0
-
-  # Check if any output options are given
-  # If they are not, turn them on by default
-  # This makes the thing easier to use, basically.
-  if not options.include?(:o) then
-    matches = false
-    OUTPUT_OPTIONS.each{|o|
-      matches = true if options.include?(o)
-    }
-    options += DEFAULT_OUTPUT_OPTIONS if not matches
-  end
 
   # List filename by default if file length over 1
   options << :f if not options.include?(:n) and files.length > 1
@@ -177,11 +169,11 @@ def parse_args
   rx_flags |= Regexp::IGNORECASE  if options.include?(:i)
   rx_flags |= Regexp::EXTENDED    if options.include?(:e)
   rx_flags |= Regexp::MULTILINE   if options.include?(:m)
-  conditions.each{|k, v|
+  conditions.each{ |k, v|
     conditions[k] = Regexp.new(v, rx_flags)
   }
 
-  return files, conditions, options
+  return files, conditions, options.uniq, output
 end
 
 # -----------------------------------------------------------------------------
@@ -200,7 +192,7 @@ require 'bibtex'
 
 # -----------------------------------------------------------------------------
 # Load everything from ARGV
-files, conditions, options = parse_args
+files, conditions, options, fields = parse_args
 
 
 
@@ -225,6 +217,11 @@ if options.include?(:V) then
   puts "\nFilters:"
   conditions.each{|k, v|
     puts " #{k}: #{v.inspect}"
+  }
+
+  puts "\nOutput fields:"
+  fields.each{|f|
+    puts "  #{f}"
   }
 
   puts "\nActive Options: "
@@ -281,15 +278,17 @@ files.each{|filename, f|
           if options.include?(:c) and b.type.to_s.downcase == 'comment' then
             output << b.content
           else
-            options.each{|o|
-              if OUTPUT_FIELD_FORMATS.keys.include?(o) then
-                # Load value and apply placeholder if empty
-                val   = b.send(OUTPUT_FIELD_FORMATS[o][:field])
-                val ||= "<no #{OUTPUT_FIELD_FORMATS[o][:field]}>" if not options.include?(:p)
-
-                # Add to the output array
-                output << OUTPUT_FIELD_FORMATS[o][:str] % val
+            fields.each{|f|
+              # Load value and apply placeholder if empty
+              val = nil
+              begin
+                val   = b.send(f.to_sym)
+              rescue Exception
               end
+              val ||= "<no #{f}>" if not options.include?(:p)
+
+              # Add to the output array
+              output << val.to_s
             }
           end
         end
