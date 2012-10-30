@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 
 # Version
-VERSION = '0.1.1 (29-10-12)'
+VERSION = '0.1.2 (30-10-12)'
 
 # If no regex is given,. check the field exists
 DEFAULT_RX = "\.+"
@@ -29,9 +29,12 @@ OPTIONS = {
             :e => {:desc => "Extended regex"},
             :m => {:desc => "Multi-line regex"},
 
+            # BibTeX options
+            :c => {:desc => "Process comment types"},
+            :w => {:desc => "Suppress BibTeX validity warnings"},
+
             # Misc.
             # :q => {:desc => "Suppress file warnings"},
-            :w => {:desc => "Suppress BibTeX validity warnings"},
             :V => {:desc => "Verbose (list conditions)"},
             :h => {:desc => "Output help"}
           }
@@ -237,44 +240,45 @@ files.each{|filename, f|
   # Open file, optimistically
   bib = BibTeX.parse(f.read)
   bib.each{|b|
+    if options.include?(:c) or b.type.to_s.downcase != 'comment' then
+      # Perform matching by unmatching things
+      # this does an AND in the arguments list
+      match = true
+      conditions.each{|key, rx|
+        if not b[key] =~ rx
+          # cancel the match
+          match = false 
+        else
+          # Report verbose matching info
+          puts "Entry #{b.key} in file #{filename} matches on key #{key}" if options.include?(:V) 
+        end
+      }
 
-    # Perform matching by unmatching things
-    # this does an AND in the arguments list
-    match = true
-    conditions.each{|key, rx|
-      if not b[key] =~ rx
-        # cancel the match
-        match = false 
-      else
-        # Report verbose matching info
-        puts "Entry #{b.key} in file #{filename} matches on key #{key}" if options.include?(:V) 
+      # Invert match if requested
+      match = (not match) if options.include?(:v)
+
+      # output
+      if match then
+
+        # define output
+        output = ""
+
+        # check if we want raw output or not
+        if options.include?(:r) then
+          output += b.to_s
+        else
+          output += "#{filename}: "                                     if options.include?(:f)
+          output += "#{placeholder(b.key, 'key', options)}: "           if options.include?(:k)
+          output += "#{placeholder(b.type, 'type', options)}: "         if options.include?(:T)
+          output += "#{placeholder(b.author, 'author', options)}: "     if options.include?(:a)
+          output += "`#{placeholder(b.title, 'title', options)}' "      if options.include?(:t)
+          output += "in #{placeholder(b.journal, 'journal', options)}"  if options.include?(:j)
+          # output += "#{b.type}: "   if options.include?(:t)
+        end
+
+        # and output
+        puts output if output.length > 0
       end
-    }
-
-    # Invert match if requested
-    match = (not match) if options.include?(:v)
-
-    # output
-    if match then
-
-      # define output
-      output = ""
-
-      # check if we want raw output or not
-      if options.include?(:r) then
-        output += b.to_s
-      else
-        output += "#{filename}: "                                     if options.include?(:f)
-        output += "#{placeholder(b.key, 'key', options)}: "           if options.include?(:k)
-        output += "#{placeholder(b.type, 'type', options)}: "         if options.include?(:T)
-        output += "#{placeholder(b.author, 'author', options)}: "     if options.include?(:a)
-        output += "`#{placeholder(b.title, 'title', options)}' "      if options.include?(:t)
-        output += "in #{placeholder(b.journal, 'journal', options)}"  if options.include?(:j)
-        # output += "#{b.type}: "   if options.include?(:t)
-      end
-
-      # and output
-      puts output if output.length > 0
     end
   }
 }
