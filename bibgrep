@@ -246,8 +246,8 @@ files.each{|filename, f|
       match = true
       conditions.each{|key, rx|
 
-
-        if not b[key] =~ rx
+        test_val = (key == 'type') ? b.type : b[key]
+        if not test_val =~ rx
           # cancel the match
           match = false 
         else
