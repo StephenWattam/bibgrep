@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 
 # Version
-VERSION = '0.1.3 (30-10-12)'
+VERSION = '0.1.4 (11-04-13)'
 
 # If no regex is given,. check the field exists
 DEFAULT_RX = "\.+"
@@ -53,7 +53,8 @@ def usage
   $stderr.puts "          begins with a dash, prefix the argument with "
   $stderr.puts "          two dashes thus: 'lsbib -- -.bib'"
   
-  $stderr.puts "  FIELD : One of BibTeX's field names.  Not case-sensitive."
+  $stderr.puts "  FIELD : One of BibTeX's field names or one of #{PSEUDO_KEYS.map{|x| "'#{x}'"}.join(", ")}."
+  $stderr.puts "          Not case-sensitive."
   $stderr.puts "  FLAGS : A string containing some of the options below."
   $stderr.puts "          Default is -#{DEFAULT_OPTIONS.join('')}."
   OPTIONS.each{|k,v|
