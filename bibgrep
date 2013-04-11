@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 
 # Version
-VERSION = '0.1.4 (11-04-13)'
+VERSION = '0.1.5 (11-04-13)'
 
 # If no regex is given,. check the field exists
 DEFAULT_RX = "\.+"
@@ -9,6 +9,9 @@ DEFAULT_RX = "\.+"
 # These are not technically internal keys, but metadata which
 # should still be searchable.  The is a limitation of the library.
 PSEUDO_KEYS = %w{key type}
+
+# Field separator for non-bibtex-format output
+DEFAULT_SEPARATOR = ": "
 
 OPTIONS = {
             :f => {:desc => "Output filename (default if multiple files used)"},
@@ -18,6 +21,7 @@ OPTIONS = {
             # Raw output
             :r => {:desc => "Output BibTeX (Cannot be used with -o)"},
             :o => {:desc => "Specify output fields (o[=]field[,field[,field]])"},
+            :s => {:desc => "Specify field separator (s[=]sepstring).  Default is '#{DEFAULT_SEPARATOR}'."},
 
             # Regex options
             :v => {:desc => "Invert match"},
@@ -74,6 +78,7 @@ def parse_args
   conditions  = {}
   options     = DEFAULT_OPTIONS
   output      = []
+  separator   = DEFAULT_SEPARATOR
 
   # Parse input arguments
   force_file = false
@@ -127,6 +132,14 @@ def parse_args
                   output += fields
                 end
 
+              elsif o == 's' then
+                options << :s
+                  
+                # Tell the loop to ignore further things from this group
+                long_arg = true
+                
+                # Ignore leading equals and cut up by space
+                separator = a[(i+1)..-1].gsub(/^=/, '').to_s
               else
                 # Flag option
                 options << o.to_sym 
@@ -175,7 +188,7 @@ def parse_args
     conditions[k] = Regexp.new(v, rx_flags)
   }
 
-  return files, conditions, options.uniq, output
+  return files, conditions, options.uniq, output, separator
 end
 
 # -----------------------------------------------------------------------------
@@ -194,7 +207,7 @@ require 'bibtex'
 
 # -----------------------------------------------------------------------------
 # Load everything from ARGV
-files, conditions, options, fields = parse_args
+files, conditions, options, fields, separator = parse_args
 
 
 
@@ -223,7 +236,7 @@ if options.include?(:V) then
 
   puts "\nOutput fields:"
   fields.each{|f|
-    puts "  #{f}"
+    puts " #{f}"
   }
 
   puts "\nActive Options: "
@@ -298,7 +311,7 @@ files.each{|filename, f|
         end
 
         # and output
-        puts output.join(": ") if output.length > 0
+        puts output.join(separator.to_s) if output.length > 0
       end
     end
   }
