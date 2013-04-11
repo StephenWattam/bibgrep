@@ -6,6 +6,10 @@ VERSION = '0.1.3 (30-10-12)'
 # If no regex is given,. check the field exists
 DEFAULT_RX = "\.+"
 
+# These are not technically internal keys, but metadata which
+# should still be searchable.  The is a limitation of the library.
+PSEUDO_KEYS = %w{key type}
+
 OPTIONS = {
             :f => {:desc => "Output filename (default if multiple files used)"},
             :F => {:desc => "Suppress filename output with multiple files."},
@@ -246,8 +250,8 @@ files.each{|filename, f|
       match = true
       conditions.each{|key, rx|
 
-        test_val = (key == 'type') ? b.type : b[key]
-        if not test_val =~ rx
+        # Check matching on the condition, with the key or pseudo-key (object property)
+        if not ((PSEUDO_KEYS.include?(key)) ? b.send(key.to_sym) : b[key]) =~ rx
           # cancel the match
           match = false 
         else
