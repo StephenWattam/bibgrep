@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 
 # Version
-VERSION = '0.1.5 (11-04-13)'
+VERSION = '0.1.5 (23-04-13)'
 
 # If no regex is given,. check the field exists
 DEFAULT_RX = "\.+"
@@ -47,7 +47,7 @@ DEFAULT_OPTIONS         = "rw".chars.map{|c| c.to_sym}
 def usage
   $stderr.puts "BibGrep v#{VERSION}"
   $stderr.puts ""
-  $stderr.puts "USAGE: #{$0} [-FLAGS] [-oFIELD] [-o=FIELD[,FIELD2[,...]]] [+FIELD[=RX] [+FIELD[=RX] [...]]] [FILE [FILE [...]]"
+  $stderr.puts "USAGE: #{File.basename($0)} [-FLAGS] [-oFIELD] [-o=FIELD[,FIELD2[,...]]] [+FIELD[=RX] [+FIELD[=RX] [...]]] [FILE [FILE [...]]"
   $stderr.puts ""
   $stderr.puts "Where..."
   $stderr.puts " FIELD : A BibTeX key to match on."
